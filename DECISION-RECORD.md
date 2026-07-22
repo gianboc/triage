@@ -57,4 +57,11 @@ Running log of **decisions made** and **changes actually applied to the machine*
 - **Result / observed:** First report pushed and verified end-to-end (raw JSON fresh, event logged, Pages 200). Privacy filter: machine vitals only — no usernames, no job names.
 - **Follow-up:** (a) tomorrow's kdump reboot is the free end-to-end test — a `REBOOT mini03` event should appear on the page within ~6 min of boot; (b) enroll mini01/02 once SSH keys exist for them; (c) active alerts (mail/Telegram) deliberately out of scope for v0; (d) Slurm's default job **requeue-after-reboot** behavior needs a policy decision (parked).
 
+## 2026-07-22 — mini01 + mini02 enrolled in ministatus (reporting only)
+- **Context:** Extend fleet visibility beyond mini03. Explicitly reporting-only — none of the P1 stability changes were applied to mini01/02.
+- **Decision / action:** Same unprivileged recipe as mini03 on each box: dedicated deploy key (write, repo-scoped, registered on `gianboc/ministatus`), `data`-branch clone at `~/ministatus`, heartbeat + `@reboot` crontab lines. Preflight confirmed git 2.43 / active cron / empty crontab / GitHub egress on both. One bug caught during rollout: the crontab-append one-liner silently installed an *empty* crontab (`grep -v` exits 1 on empty input under `set -e`); fixed with a `|| true` guard and re-verified — both crontabs now show the two lines.
+- **Applied to machine?:** Yes (mini01, mini02: crontab, `~/ministatus`, `~/.ssh` deploy key + alias). No system config touched, no sudo used.
+- **Result / observed:** All three minis reporting. Fleet is homogeneous: 48 cores / 252 GB each. mini01 under real load (~11.7) at enrollment time; mini02 idle.
+- **Follow-up:** None — reboot events will accumulate per node from their next boots.
+
 <!-- Append new entries below this line -->
