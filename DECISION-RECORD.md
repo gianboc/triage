@@ -64,4 +64,14 @@ Running log of **decisions made** and **changes actually applied to the machine*
 - **Result / observed:** All three minis reporting. Fleet is homogeneous: 48 cores / 252 GB each. mini01 under real load (~11.7) at enrollment time; mini02 idle.
 - **Follow-up:** None — reboot events will accumulate per node from their next boots.
 
+## 2026-07-22 — ministatus v0.2: peer-confirmed down detection + load-history charts
+- **Context:** Two upgrades requested the same evening: (1) active down-detection instead of staleness-only inference; (2) per-node load charts (24 h / 7 d / 30 d).
+- **Decision / action:**
+  - **Peer checks:** each heartbeat TCP-probes the other minis' SSH port (full mesh verified beforehand) and records `"peers"` in its JSON. Page logic: own heartbeat fresh → UP; stale but fresh peers reach it → **NOT REPORTING** (amber — reporting pipeline broke); fresh peers can't reach it → **UNREACHABLE** (red, peer-confirmed, ~5–10 min detection); no peer data → old staleness rules. Heartbeat stays at 5 min (raw CDN caches ~5 min, so a faster cron buys nothing).
+  - **History:** heartbeats append `t,load1` to `history/<host>.csv` (pruned to 35 days); page renders three SVG charts per node (24 h raw, 7 d 2-h means, 30 d 8-h means) of load as % of cores, with hover readout. `node/backfill_sar.sh` seeded ~8 days of sar history per node (mini01 1190, mini02 1179, mini03 846 samples).
+  - **Bugs found & fixed during rollout:** (a) `git add -A` in report.sh was committing the script copies into the data branch, causing cross-node collisions — fixed with data-branch `.gitignore` + untracking; (b) report.sh pulled *after* dirtying the tree — moved the pull to the top; (c) one corrupt sar archive on mini03 (crash-day file, likely sa21) silently killed the whole backfill under `pipefail` — per-file `|| true` guard added.
+- **Applied to machine?:** Yes (all three minis: updated `~/ministatus/report.sh`, ran backfill). Unprivileged throughout.
+- **Result / observed:** Full peer mesh green in live JSONs; all node clones clean and synced; history on the remote. Operational note: raw.githubusercontent **ignores query-string cache-busters** — content updates surface within ~5 min regardless; page thresholds already account for it.
+- **Follow-up:** none pending; tomorrow's kdump reboot doubles as the live test of REBOOT events + peer-detection.
+
 <!-- Append new entries below this line -->
