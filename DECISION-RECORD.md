@@ -74,4 +74,11 @@ Running log of **decisions made** and **changes actually applied to the machine*
 - **Result / observed:** Full peer mesh green in live JSONs; all node clones clean and synced; history on the remote. Operational note: raw.githubusercontent **ignores query-string cache-busters** — content updates surface within ~5 min regardless; page thresholds already account for it.
 - **Follow-up:** none pending; tomorrow's kdump reboot doubles as the live test of REBOOT events + peer-detection.
 
+## 2026-07-22 — kdump armed + controlled reboot test: P1 COMPLETE
+- **Context:** Queue empty, no SSH users (only a day-old idle console session), gboccardo available to pull the trigger — so the kdump install originally planned for the next office visit was done remotely instead, and the reboot doubled as the end-to-end test of the ministatus reboot notification.
+- **Decision / action:** `apt-get install -y linux-crashdump` via scoped sudo (crashkernel=…,128G-:4096M staged in grub by the package; kdump-tools enabled). gboccardo ran `sudo reboot` from his own session at 22:33.
+- **Applied to machine?:** Yes (package install + reboot).
+- **Result / observed:** Down 22:33:53 → SSH back 22:35:40 (**1 m 47 s downtime**, including the new 4 GB crashkernel reservation). Post-boot verified: `kexec_crash_loaded=1` (**kdump armed**), panic sysctls persisted (`panic=10`, `hardlockup_panic=1`), iTCO module config loaded (still BIOS-blocked, as expected). ministatus chain worked unattended: `@reboot` cron fired, `BOOT mini03` event pushed 1 m 41 s after boot, page shows the reboot chip + event row + first entry of the last-5-reboots list. **P1 is now fully in place**: self-recovery via panic sysctls, crash capture via kdump, hardware-error logging via rasdaemon, reboot visibility via ministatus.
+- **Follow-up:** Watchdog device still missing (BIOS locks iTCO): try `sudo modprobe mei_wdt` (2-min test, any time), else check BIOS at the next physical visit. Root-cause hunt now waits for the next freeze — which will either self-recover + leave a crash dump, or be peer-flagged on the status page within minutes.
+
 <!-- Append new entries below this line -->

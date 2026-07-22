@@ -16,12 +16,7 @@ Goal: even before we know the root cause, the box should reboot itself and recor
   kernel.hung_task_panic = 1
   kernel.hardlockup_panic = 1   # addition: NMI hardlockup detector was warn-only; now panics → reboots
   ```
-- [ ] **Capture the cause of the next freeze** — set up **kdump** (`crashkernel=` + `kdump-tools`) and/or **netconsole** to a second host. A hard lockup can't write to local disk, so remote/crash-kernel capture is the only way to get the panic string. **Ubuntu recipe (needs a maintenance window — reboot required, run by gboccardo):**
-  ```bash
-  sudo apt install -y linux-crashdump    # sets crashkernel= via /etc/default/grub.d/kdump-tools.cfg
-  sudo reboot                            # reserves the crash kernel memory
-  kdump-config show                      # verify: "current state: ready to kdump"
-  ```
+- [x] **Capture the cause of the next freeze** — ✅ **kdump ARMED 2026-07-22 evening** (`linux-crashdump` installed via scoped sudo; gboccardo rebooted; verified `kexec_crash_loaded=1` post-boot; crashkernel reservation 4096M on this 256 GB box; panic sysctls confirmed persistent across the reboot). Total reboot downtime 1 m 47 s. Next freeze that panics will leave a crash dump in `/var/crash`. *(netconsole remains an option if kdump proves insufficient.)*
 - [x] **Install rasdaemon** — ✅ applied 2026-07-22: installed, enabled, active (`ras-mc-ctl: drivers are loaded`).
 
 **Risk:** very low. Watchdog + panic-reboot only act when the box is *already* broken. Only caveat: once armed, a future hang will reboot on its own — make sure that's acceptable mid-job (it is; a hung box loses the jobs anyway).
