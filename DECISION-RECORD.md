@@ -32,4 +32,22 @@ Running log of **decisions made** and **changes actually applied to the machine*
 - **Result / observed:** Confirmed: scheduler accounts memory (`CR_CORE_MEMORY`) but no runtime confinement. Prepared file lives at `/home/gboccardo/git/mulmopro/sysAdmin/1-installation/slurmFiles/cgroup.conf`. Arming steps captured in [PROPOSED-FIXES.md §P3](PROPOSED-FIXES.md).
 - **Follow-up:** Arm cgroup enforcement on a maintenance window, after announcing the behavior change to the group.
 
+## 2026-07-22 — Remote-ops setup: home-side Claude, SSH keys, scoped sudoers
+- **Context:** Operations moved to a home-machine session driving `mini03` over SSH (a session on the box can't observe its own reboot). The home machine had no SSH config or keys for the minis — access had always been password-based from Windows.
+- **Decision / action:** Created a dedicated ed25519 keypair + `~/.ssh/config` aliases (`mini01/02/03` → `*.polito.it`, user gboccardo) on the home machine. gboccardo installed the public key (`ssh-copy-id`) and a **scoped NOPASSWD sudoers drop-in** on `mini03` — enumerated P1 commands only (modprobe iTCO_wdt, tee into `modules-load.d`/`sysctl.d`/`system.conf.d`, daemon-reexec, sysctl --system, apt-get install, wdctl). Never `NOPASSWD: ALL`.
+- **Applied to machine?:** Yes (authorized_keys + sudoers drop-in, installed manually by gboccardo).
+- **Result / observed:** Key-based SSH from home works; `sudo -n -l` confirms the enumerated list. Caveat noted for fleet reuse: sudoers `*` wildcards also match spaces, so `tee /etc/sysctl.d/*` is wider than it looks.
+- **Follow-up:** Replicate key + sudoers pattern on mini01/02 if this becomes routine.
+
+## 2026-07-22 — P1 applied: panic sysctls are the recovery path; iTCO watchdog is BIOS-locked
+- **Context:** Implementing P1 (self-recovery) per [PROPOSED-FIXES.md](PROPOSED-FIXES.md). Queue empty, one interactive user, load ~0.
+- **Decision / action:** Applied over SSH via the scoped sudo:
+  1. `/etc/modules-load.d/watchdog.conf` (iTCO_wdt) + `modprobe iTCO_wdt` — module loads but reports **`unable to reset NO_REBOOT flag, device disabled by hardware/BIOS`** → **no `/dev/watchdog`**. Board identified as **HP Z8 G4** (board 81C7): the chipset TCO watchdog is locked off in firmware.
+  2. `/etc/systemd/system.conf.d/10-watchdog.conf` (`RuntimeWatchdogSec=30`, `RebootWatchdogSec=5min`) + `daemon-reexec` — accepted (`RuntimeWatchdogUSec=30s`), **inert until a watchdog device exists**, arms automatically once one does.
+  3. `/etc/sysctl.d/99-hang-recovery.conf`: `kernel.panic=10`, `kernel.panic_on_oops=1`, `kernel.hung_task_panic=1`, **plus `kernel.hardlockup_panic=1`** (addition to the original plan: the NMI hardlockup detector was already running warn-only — it detects exactly the observed failure shape, so it now panics → reboots). Verified live and persistent.
+  4. `apt-get install -y rasdaemon` — enabled + active, drivers loaded.
+- **Applied to machine?:** Yes (items 1–4).
+- **Result / observed:** First-ever automatic recovery path is live: any oops, 2-min hung task, or NMI-detectable hard lockup now reboots the box in ~10 s. **Coverage gap:** a wedge the NMI detector can't see (SMM/firmware/hardware-level) still has no recovery — that needs a real hardware watchdog.
+- **Follow-up:** (a) try **`mei_wdt`** — Intel ME watchdog; `/dev/mei0` present and `mei_me` loaded, so the Z8's ME may expose a usable `/dev/watchdog` (needs a sudoers extension or a manual `modprobe mei_wdt`); (b) check BIOS for a TCO/watchdog enable on the next physical visit; (c) kdump (`linux-crashdump` + reboot) still pending — needs a maintenance window.
+
 <!-- Append new entries below this line -->

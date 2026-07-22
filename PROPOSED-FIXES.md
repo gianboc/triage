@@ -8,25 +8,21 @@ Prioritized plan. **Nothing here is applied until it's logged in [DECISION-RECOR
 
 Goal: even before we know the root cause, the box should reboot itself and record *why* next time.
 
-- [ ] **Enable the hardware watchdog** (only remote-recovery path — no BMC):
-  ```bash
-  echo iTCO_wdt | sudo tee /etc/modules-load.d/watchdog.conf
-  sudo modprobe iTCO_wdt
-  # in /etc/systemd/system.conf:
-  #   RuntimeWatchdogSec=30
-  #   RebootWatchdogSec=5min
-  sudo systemctl daemon-reexec
-  # verify:  wdctl   (should show the iTCO device armed)
-  ```
-- [ ] **Auto-reboot on panic/oops** — `/etc/sysctl.d/99-hang-recovery.conf`:
+- [x] ~~**Enable the hardware watchdog**~~ **BLOCKED BY BIOS (2026-07-22):** module loads but `iTCO_wdt: unable to reset NO_REBOOT flag, device disabled by hardware/BIOS` → no `/dev/watchdog`. Board is an **HP Z8 G4**. Config left in place (`/etc/modules-load.d/watchdog.conf` + `/etc/systemd/system.conf.d/10-watchdog.conf` with `RuntimeWatchdogSec=30` / `RebootWatchdogSec=5min`) — inert, arms automatically if a device appears. Alternatives, in order: try **`mei_wdt`** (Intel ME watchdog — `/dev/mei0` exists on this box; `sudo modprobe mei_wdt`, then check `wdctl`; if it works, add to modules-load + re-run `systemctl daemon-reexec`); else look for a watchdog/TCO enable in BIOS setup on the next physical visit.
+- [x] **Auto-reboot on panic/oops** — ✅ applied 2026-07-22, live + persistent (`/etc/sysctl.d/99-hang-recovery.conf`):
   ```
   kernel.panic = 10
   kernel.panic_on_oops = 1
   kernel.hung_task_panic = 1
+  kernel.hardlockup_panic = 1   # addition: NMI hardlockup detector was warn-only; now panics → reboots
   ```
-  then `sudo sysctl --system`.
-- [ ] **Capture the cause of the next freeze** — set up **kdump** (`crashkernel=` + `kdump-tools`) and/or **netconsole** to a second host. A hard lockup can't write to local disk, so remote/crash-kernel capture is the only way to get the panic string.
-- [ ] **Install rasdaemon** to log silent ECC / PCIe-AER / thermal hardware errors: `sudo apt install rasdaemon`.
+- [ ] **Capture the cause of the next freeze** — set up **kdump** (`crashkernel=` + `kdump-tools`) and/or **netconsole** to a second host. A hard lockup can't write to local disk, so remote/crash-kernel capture is the only way to get the panic string. **Ubuntu recipe (needs a maintenance window — reboot required, run by gboccardo):**
+  ```bash
+  sudo apt install -y linux-crashdump    # sets crashkernel= via /etc/default/grub.d/kdump-tools.cfg
+  sudo reboot                            # reserves the crash kernel memory
+  kdump-config show                      # verify: "current state: ready to kdump"
+  ```
+- [x] **Install rasdaemon** — ✅ applied 2026-07-22: installed, enabled, active (`ras-mc-ctl: drivers are loaded`).
 
 **Risk:** very low. Watchdog + panic-reboot only act when the box is *already* broken. Only caveat: once armed, a future hang will reboot on its own — make sure that's acceptable mid-job (it is; a hung box loses the jobs anyway).
 
