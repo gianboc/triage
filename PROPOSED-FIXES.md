@@ -37,6 +37,8 @@ Goal: even before we know the root cause, the box should reboot itself and recor
 
 ## P3 — Arm Slurm per-job memory enforcement  *(addresses P-B; do on a maintenance window)*
 
+> ⚠️ **Attempted 2026-07-23 — REVERTED (unsolved).** Plugins loaded and CPU/device confinement worked, but RAM `memory.max` never got set (cgroup v2, Slurm 23.11.4) despite a verified-healthy environment and no slurmd error. Rolled back to keep the box usable for the group. Root cause not isolated. Full detail + leading hypothesis in [DECISION-RECORD.md](DECISION-RECORD.md) (2026-07-23 entry). Don't retry on a shared window.
+
 The `cgroup.conf` is already written; this arms it. **Do this on a drained node and warn the group first** — see behavior-change note below.
 
 1. [ ] Copy the prepared file and add swap constraint + drop the v1 leftover:

@@ -45,6 +45,8 @@ In every case: free memory abundant, swap empty, nothing stuck on I/O. **No memo
 
 > One clue: the Jul 15 freeze was preceded by heavy disk **writeback** (multi-GB dirty pages, ~223 GB page cache), so the **NVMe / storage path** stays on the suspect list — but `kbavail` was still ~250 GB, so it was not a memory shortage.
 
+> ⚠️ **Caveat added 2026-07-23 — this exoneration is weaker than it first read.** A deliberate memory-overcommit stress test (see [DECISION-RECORD.md](DECISION-RECORD.md), 2026-07-23) drove mini03 from healthy to a **no-logs, power-cycle-only freeze in ~1 minute**. Two implications: (1) the table above rests on `sar`'s **10-minute** sampling, so a fast fill-to-freeze spike falls *between* samples and would look exactly like "normal, then a gap" — sar cannot exclude a fast memory spike. (2) Memory pressure *can* produce the same "nothing logged / needs physical reset" signature as these hangs. It still differs in one way — the stress-test freeze stayed **pingable** (userspace-starved livelock, kernel alive) whereas these originals were **pingless** (kernel wedged) — so they're probably distinct at the kernel level, and **P2 (kernel 6.14 / NVIDIA / NVMe) remains prime**. But "not memory" is no longer a clean conclusion.
+
 ---
 
 ## 3. Problems identified
